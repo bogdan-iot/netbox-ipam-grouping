@@ -1,0 +1,138 @@
+{% extends 'generic/object.html' %}
+
+{% block content %}
+<div class="row">
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">Application</h5>
+      <div class="card-body">
+        <table class="table table-hover attr-table">
+          <tr>
+            <th scope="row">Name</th>
+            <td>{{ object.name }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Slug</th>
+            <td>{{ object.slug }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Owner</th>
+            <td>
+              {% if object.owner %}
+                <a href="{{ object.owner.get_absolute_url }}">{{ object.owner }}</a>
+              {% else %}
+                <span class="text-muted">&mdash;</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Description</th>
+            <td>{{ object.description|default:"&mdash;" }}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-3">
+  <div class="col col-md-12">
+    <div class="card">
+      <h5 class="card-header">Groups</h5>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead>
+            <tr><th>Name</th><th>Owner</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            {% for group in ipam_groups %}
+              <tr>
+                <td><a href="{{ group.get_absolute_url }}">{{ group.name }}</a></td>
+                <td>
+                  {% if group.owner %}
+                    <a href="{{ group.owner.get_absolute_url }}">{{ group.owner }}</a>
+                  {% else %}
+                    <span class="text-muted">&mdash;</span>
+                  {% endif %}
+                </td>
+                <td>{{ group.description|default:"&mdash;" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="text-muted">No groups assigned.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-3">
+  <div class="col col-md-12">
+    <div class="card">
+      <h5 class="card-header">Prefixes</h5>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead><tr><th>Prefix</th><th>Description</th></tr></thead>
+          <tbody>
+            {% for prefix in prefixes %}
+              <tr>
+                <td><a href="{{ prefix.get_absolute_url }}">{{ prefix }}</a></td>
+                <td>{{ prefix.description|default:"&mdash;" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="2" class="text-muted">No prefixes assigned.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-3">
+  <div class="col col-md-12">
+    <div class="card">
+      <h5 class="card-header">IP Addresses</h5>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead><tr><th>Address</th><th>Description</th></tr></thead>
+          <tbody>
+            {% for ip in ip_addresses %}
+              <tr>
+                <td><a href="{{ ip.get_absolute_url }}">{{ ip }}</a></td>
+                <td>{{ ip.description|default:"&mdash;" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="2" class="text-muted">No IP addresses assigned.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-3">
+  <div class="col col-md-12">
+    <div class="card">
+      <h5 class="card-header">IP Ranges</h5>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead><tr><th>Range</th><th>Description</th></tr></thead>
+          <tbody>
+            {% for range in ip_ranges %}
+              <tr>
+                <td><a href="{{ range.get_absolute_url }}">{{ range }}</a></td>
+                <td>{{ range.description|default:"&mdash;" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="2" class="text-muted">No IP ranges assigned.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

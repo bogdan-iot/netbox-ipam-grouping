@@ -1,0 +1,106 @@
+{% extends 'generic/object_edit.html' %}
+
+{% block javascript %}
+{{ block.super }}
+<style>
+  /*
+   * Visual lock applied to IPAM picker containers when no application is
+   * selected. pointer-events:none prevents all mouse interaction without
+   * touching the underlying <select> or Tom Select instance, so the widget
+   * stays fully initialised and responds normally once the class is removed.
+   */
+  .ipam-field-locked {
+    opacity: 0.45;
+    pointer-events: none;
+    user-select: none;
+    position: relative;
+  }
+  .ipam-field-locked::after {
+    content: 'Select an application first';
+    position: absolute;
+    bottom: -1.2rem;
+    left: 0;
+    font-size: 0.78rem;
+    color: #6c757d;
+    font-style: italic;
+  }
+</style>
+<script>
+/**
+ * Group form — dynamic IPAM field filtering.
+ *
+ * Strategy:
+ *   - The three IPAM pickers use query_params={"cf_fra_application":"$application"}
+ *     so NetBox's widget JS automatically appends cf_fra_application=<pk> to
+ *     every AJAX call when an application is selected.
+ *   - When no application is selected, $application resolves to "", making the
+ *     call ?cf_fra_application= (empty). The ScopedXxxFilterSet on the server
+ *     intercepts this and returns queryset.none() — no options shown.
+ *   - We do NOT use HTML disabled so Tom Select initialises normally and
+ *     responds correctly when we unlock the field.
+ *   - We apply a CSS class (.ipam-field-locked) to visually disable the field
+ *     containers and block pointer events.
+ */
+(function () {
+    'use strict';
+
+    const IPAM_IDS = ['id_prefixes', 'id_ip_addresses', 'id_ip_ranges'];
+
+    function getContainer(id) {
+        const el = document.getElementById(id);
+        if (!el) return null;
+        // Walk up to find the bootstrap form row / mb-3 container
+        return el.closest('.mb-3') || el.closest('.row') || el.parentElement;
+    }
+
+    function getApplicationValue() {
+        const el = document.getElementById('id_application');
+        return el ? el.value.trim() : '';
+    }
+
+    function lockIpamFields() {
+        IPAM_IDS.forEach(function (id) {
+            const container = getContainer(id);
+            if (container) container.classList.add('ipam-field-locked');
+
+            // Clear any Tom Select selections so stale values don't persist
+            const el = document.getElementById(id);
+            if (el && el.tomselect) {
+                el.tomselect.clear(true);
+            }
+        });
+    }
+
+    function unlockIpamFields() {
+        IPAM_IDS.forEach(function (id) {
+            const container = getContainer(id);
+            if (container) container.classList.remove('ipam-field-locked');
+        });
+    }
+
+    function onApplicationChange() {
+        if (getApplicationValue()) {
+            unlockIpamFields();
+        } else {
+            lockIpamFields();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const appEl = document.getElementById('id_application');
+        if (!appEl) return;
+
+        // Native change covers plain <select> (non-admin ChoiceField)
+        appEl.addEventListener('change', onApplicationChange);
+
+        // Tom Select / select2 events for DynamicModelChoiceField (admin)
+        if (window.$) {
+            $(appEl).on('select2:select select2:unselect select2:clear', onApplicationChange);
+        }
+
+        // Apply initial state after a tick so Tom Select has finished init
+        setTimeout(onApplicationChange, 0);
+    });
+}());
+</script>
+{% endblock javascript %}
