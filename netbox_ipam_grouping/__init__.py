@@ -9,8 +9,8 @@ class NetboxIpamGroupingConfig(PluginConfig):
         "and assign them to applications, with ownership-scoped editing."
     )
     version = "1.0.0"
-    author = "Your Organisation"
-    author_email = "netbox@example.com"
+    author = "Bogdan Radu"
+    author_email = "bogdan@iot-elite.com"
     base_url = "ipam-grouping"
     min_version = "4.5.0"
     required_settings = []

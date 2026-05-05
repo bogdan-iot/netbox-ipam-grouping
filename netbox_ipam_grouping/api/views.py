@@ -3,12 +3,13 @@ from netbox.api.viewsets import NetBoxModelViewSet
 
 from ..models import Application, Group
 from .serializers import ApplicationSerializer, GroupSerializer
-from .filtersets import GroupAPIFilterSet
+from .filtersets import ApplicationAPIFilterSet, GroupAPIFilterSet
 
 
 class ApplicationViewSet(NetBoxModelViewSet):
     queryset = Application.objects.prefetch_related("owner", "tags")
     serializer_class = ApplicationSerializer
+    filterset_class = ApplicationAPIFilterSet
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -23,7 +24,7 @@ class ApplicationViewSet(NetBoxModelViewSet):
 
 class GroupViewSet(NetBoxModelViewSet):
     queryset = Group.objects.prefetch_related(
-        "owner", "application", "prefixes", "ip_addresses", "ip_ranges", "tags",
+        "owner", "application", "parent", "prefixes", "ip_addresses", "ip_ranges", "tags",
     )
     serializer_class = GroupSerializer
     filterset_class = GroupAPIFilterSet
