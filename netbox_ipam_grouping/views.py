@@ -55,13 +55,13 @@ class ApplicationView(generic.ObjectView):
 
     def get_extra_context(self, request, instance):
         prefixes = Prefix.objects.filter(
-            custom_field_data__fra_application=instance.pk
+            custom_field_data__ipam_application=instance.pk
         ).order_by("prefix")
         ip_addresses = IPAddress.objects.filter(
-            custom_field_data__fra_application=instance.pk
+            custom_field_data__ipam_application=instance.pk
         ).order_by("address")
         ip_ranges = IPRange.objects.filter(
-            custom_field_data__fra_application=instance.pk
+            custom_field_data__ipam_application=instance.pk
         ).order_by("start_address")
         return {
             "ipam_groups": instance.ipam_groups.prefetch_related("owner"),

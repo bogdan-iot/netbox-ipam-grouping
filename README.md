@@ -7,7 +7,7 @@ A [NetBox](https://github.com/netbox-community/netbox) plugin that lets you grou
 - **Applications** — standalone entities with a name, slug, and owner. Used to represent systems or services that own IPAM resources.
 - **Groups** — named collections of IP Addresses, Prefixes, and IP Ranges, linked to an Application and an Owner.
 - **Ownership scoping** — non-admin users can only see and edit Groups and Applications belonging to Owners they are members of.
-- **IPAM object scoping** — when editing a Group, the IP Address / Prefix / IP Range pickers are filtered to objects the user owns (via the `fra_application` custom field).
+- **IPAM object scoping** — when editing a Group, the IP Address / Prefix / IP Range pickers are filtered to objects the user owns (via the `ipam_application` custom field).
 - **Native NetBox Ownership** — uses `users.Owner` (NetBox 4.5+) rather than raw Django users/groups.
 
 ## Requirements
@@ -37,7 +37,7 @@ python netbox/manage.py migrate netbox_ipam_grouping
 
 ## Custom Field Setup
 
-This plugin expects a custom field named `fra_application` of type **Object** pointing to `netbox_ipam_grouping | application`, assigned to:
+This plugin expects a custom field named `ipam_application` of type **Object** pointing to `netbox_ipam_grouping | application`, assigned to:
 - `ipam | ip address`
 - `ipam | prefix`
 - `ipam | ip range`

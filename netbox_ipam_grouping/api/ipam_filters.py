@@ -3,7 +3,7 @@ from django.db.models import Q
 
 class OwnershipQueryParamFilterMixin:
     """
-    Filters IPAM objects to those whose fra_application custom field points
+    Filters IPAM objects to those whose ipam_application custom field points
     to an Application owned by the given user (directly or via user_group).
     """
 
@@ -29,5 +29,5 @@ class OwnershipQueryParamFilterMixin:
             return queryset.none()
 
         return queryset.filter(
-            custom_field_data__fra_application__in=app_pks
+            custom_field_data__ipam_application__in=app_pks
         ).distinct()

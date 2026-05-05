@@ -73,31 +73,31 @@ class GroupForm(NetBoxModelForm):
         selector=True,
     )
 
-    # $application causes the widget to append cf_fra_application=<pk> to every
+    # $application causes the widget to append cf_ipam_application=<pk> to every
     # AJAX call whenever the application field changes.
     # When no application is selected, $application resolves to "" which makes
-    # the API call ?cf_fra_application= (empty). The ScopedXxxFilterSet
+    # the API call ?cf_ipam_application= (empty). The ScopedXxxFilterSet
     # intercepts this and returns queryset.none() — so no options appear.
     # Visual locking is handled by JavaScript in group_edit.html.
     prefixes = DynamicModelMultipleChoiceField(
         queryset=Prefix.objects.all(),
         required=False,
         label="Prefixes",
-        query_params={"cf_fra_application": "$application"},
+        query_params={"cf_ipam_application": "$application"},
     )
 
     ip_addresses = DynamicModelMultipleChoiceField(
         queryset=IPAddress.objects.all(),
         required=False,
         label="IP Addresses",
-        query_params={"cf_fra_application": "$application"},
+        query_params={"cf_ipam_application": "$application"},
     )
 
     ip_ranges = DynamicModelMultipleChoiceField(
         queryset=IPRange.objects.all(),
         required=False,
         label="IP Ranges",
-        query_params={"cf_fra_application": "$application"},
+        query_params={"cf_ipam_application": "$application"},
     )
 
     class Meta:
@@ -153,7 +153,7 @@ class GroupForm(NetBoxModelForm):
         ):
             objects = cleaned_data.get(field_name) or []
             for obj in objects:
-                obj_app = obj.custom_field_data.get("fra_application")
+                obj_app = obj.custom_field_data.get("ipam_application")
                 if obj_app is not None and obj_app != application.pk:
                     mismatched.append(
                         f"{label} '{obj}' is assigned to a different application."

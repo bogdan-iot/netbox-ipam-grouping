@@ -30,11 +30,11 @@
  * Group form — dynamic IPAM field filtering.
  *
  * Strategy:
- *   - The three IPAM pickers use query_params={"cf_fra_application":"$application"}
- *     so NetBox's widget JS automatically appends cf_fra_application=<pk> to
+ *   - The three IPAM pickers use query_params={"cf_ipam_application":"$application"}
+ *     so NetBox's widget JS automatically appends cf_ipam_application=<pk> to
  *     every AJAX call when an application is selected.
  *   - When no application is selected, $application resolves to "", making the
- *     call ?cf_fra_application= (empty). The ScopedXxxFilterSet on the server
+ *     call ?cf_ipam_application= (empty). The ScopedXxxFilterSet on the server
  *     intercepts this and returns queryset.none() — no options shown.
  *   - We do NOT use HTML disabled so Tom Select initialises normally and
  *     responds correctly when we unlock the field.
