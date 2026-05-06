@@ -32,6 +32,18 @@
             </td>
           </tr>
           <tr>
+            <th scope="row">Member of</th>
+            <td>
+              {% if parent_groups %}
+                {% for pg in parent_groups %}
+                  <a href="{{ pg.get_absolute_url }}">{{ pg.name }}</a>{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+              {% else %}
+                <span class="text-muted">&mdash;</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
             <th scope="row">Description</th>
             <td>{{ object.description|default:"&mdash;" }}</td>
           </tr>
@@ -39,10 +51,49 @@
       </div>
     </div>
 
-    {% include 'inc/custom_fields.html' with obj=object %}
+    {% include 'inc/panels/custom_fields.html' with obj=object %}
 
   </div>
 </div>
+
+{% if member_groups %}
+<div class="row mt-3">
+  <div class="col col-md-12">
+    <div class="card">
+      <h5 class="card-header">Member groups</h5>
+      <div class="card-body">
+        <table class="table table-hover">
+          <thead>
+            <tr><th>Name</th><th>Owner</th><th>Application</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            {% for group in member_groups %}
+              <tr>
+                <td><a href="{{ group.get_absolute_url }}">{{ group.name }}</a></td>
+                <td>
+                  {% if group.owner %}
+                    <a href="{{ group.owner.get_absolute_url }}">{{ group.owner }}</a>
+                  {% else %}
+                    <span class="text-muted">&mdash;</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if group.application %}
+                    <a href="{{ group.application.get_absolute_url }}">{{ group.application }}</a>
+                  {% else %}
+                    <span class="text-muted">&mdash;</span>
+                  {% endif %}
+                </td>
+                <td>{{ group.description|default:"&mdash;" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <div class="row mt-3">
   <div class="col col-md-12">

@@ -32,6 +32,7 @@ class GroupSerializer(NetBoxModelSerializer):
         fields = (
             "id", "url", "display", "name", "description",
             "owner", "application",
+            "member_groups",
             "ip_addresses", "prefixes", "ip_ranges",
             "ip_addresses_count", "prefixes_count", "ip_ranges_count",
             "tags", "custom_fields", "created", "last_updated",
