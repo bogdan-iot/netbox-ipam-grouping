@@ -122,7 +122,8 @@ class ApplicationBulkDeleteView(generic.BulkDeleteView):
 
 class GroupListView(generic.ObjectListView):
     queryset = Group.objects.prefetch_related(
-        "owner", "application", "prefixes", "ip_addresses", "ip_ranges", "tags",
+        "owner", "application", "member_groups",
+        "prefixes", "ip_addresses", "ip_ranges", "tags",
     )
     table = GroupTable
     filterset = GroupFilterSet
@@ -139,7 +140,8 @@ class GroupListView(generic.ObjectListView):
 
 class GroupView(generic.ObjectView):
     queryset = Group.objects.prefetch_related(
-        "owner", "application", "prefixes", "ip_addresses", "ip_ranges", "tags",
+        "owner", "application", "member_groups",
+        "prefixes", "ip_addresses", "ip_ranges", "tags",
     )
 
     def get_extra_context(self, request, instance):
@@ -147,6 +149,8 @@ class GroupView(generic.ObjectView):
             "ip_addresses": instance.ip_addresses.order_by("address"),
             "prefixes": instance.prefixes.order_by("prefix"),
             "ip_ranges": instance.ip_ranges.order_by("start_address"),
+            "member_groups": instance.member_groups.prefetch_related("owner").order_by("name"),
+            "parent_groups": instance.parent_groups.prefetch_related("owner").order_by("name"),
         }
 
 

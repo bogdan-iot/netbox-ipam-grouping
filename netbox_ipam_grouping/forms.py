@@ -73,12 +73,16 @@ class GroupForm(NetBoxModelForm):
         selector=True,
     )
 
-    # $application causes the widget to append cf_ipam_application=<pk> to every
-    # AJAX call whenever the application field changes.
-    # When no application is selected, $application resolves to "" which makes
-    # the API call ?cf_ipam_application= (empty). The ScopedXxxFilterSet
-    # intercepts this and returns queryset.none() — so no options appear.
-    # Visual locking is handled by JavaScript in group_edit.html.
+    # Self-referential M2M — groups that belong to this group.
+    # Filtered by application so only groups from the same application
+    # are available, consistent with the other IPAM object pickers.
+    member_groups = DynamicModelMultipleChoiceField(
+        queryset=Group.objects.all(),
+        required=False,
+        label="Member groups",
+        query_params={"application": "$application"},
+    )
+
     prefixes = DynamicModelMultipleChoiceField(
         queryset=Prefix.objects.all(),
         required=False,
@@ -107,6 +111,7 @@ class GroupForm(NetBoxModelForm):
             "description",
             "owner",
             "application",
+            "member_groups",
             "prefixes",
             "ip_addresses",
             "ip_ranges",
@@ -126,12 +131,29 @@ class GroupForm(NetBoxModelForm):
                     Q(users=user) | Q(user_groups__in=user.groups.all())
                 ).distinct().values_list("pk", flat=True)
             )
+
             self.fields["application"].queryset = Application.objects.filter(
                 owner__pk__in=owner_pks
             )
 
+            # Scope member_groups to groups the user owns, excluding self
+            member_qs = Group.objects.filter(
+                Q(owner__users=user) |
+                Q(owner__user_groups__in=user.groups.all())
+            ).distinct()
+            if self.instance and self.instance.pk:
+                member_qs = member_qs.exclude(pk=self.instance.pk)
+            self.fields["member_groups"].queryset = member_qs
+
             for field_name in ("prefixes", "ip_addresses", "ip_ranges"):
                 self.fields[field_name].widget.add_query_param("owned_by_user", user.pk)
+
+        else:
+            # Admin: exclude self from member_groups
+            if self.instance and self.instance.pk:
+                self.fields["member_groups"].queryset = Group.objects.exclude(
+                    pk=self.instance.pk
+                )
 
     def clean_owner(self):
         return _clean_owner(self.cleaned_data.get("owner"))
@@ -140,6 +162,24 @@ class GroupForm(NetBoxModelForm):
         cleaned_data = super().clean()
         if not cleaned_data:
             return cleaned_data
+
+        # Prevent circular membership
+        member_groups = cleaned_data.get("member_groups") or []
+        if self.instance and self.instance.pk and member_groups:
+            for candidate in member_groups:
+                # Walk up through candidate's own parent_groups to detect cycles
+                seen = set()
+                queue = list(candidate.parent_groups.all())
+                while queue:
+                    g = queue.pop()
+                    if g.pk in seen:
+                        continue
+                    seen.add(g.pk)
+                    if g.pk == self.instance.pk:
+                        raise forms.ValidationError(
+                            {"member_groups": f"Adding '{candidate}' would create a circular group membership."}
+                        )
+                    queue.extend(g.parent_groups.all())
 
         application = cleaned_data.get("application")
         if not application:
@@ -163,6 +203,19 @@ class GroupForm(NetBoxModelForm):
             raise forms.ValidationError(
                 "The following objects belong to a different application than "
                 "the one selected for this group:\n" + "\n".join(mismatched)
+            )
+
+        # A group must contain at least one member
+        has_members = any([
+            cleaned_data.get("prefixes"),
+            cleaned_data.get("ip_addresses"),
+            cleaned_data.get("ip_ranges"),
+            cleaned_data.get("member_groups"),
+        ])
+        if not has_members:
+            raise forms.ValidationError(
+                "A group must contain at least one Prefix, IP Address, "
+                "IP Range, or Member group."
             )
 
         return cleaned_data

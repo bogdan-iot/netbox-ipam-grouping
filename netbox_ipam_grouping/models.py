@@ -80,6 +80,16 @@ class Group(NetBoxModel):
         related_name="ipam_groups",
         verbose_name=_("application"),
     )
+    # Self-referential M2M:
+    #   group.member_groups.all()  → groups that belong to this group
+    #   group.parent_groups.all()  → groups this group belongs to
+    member_groups = models.ManyToManyField(
+        to="self",
+        symmetrical=False,
+        blank=True,
+        related_name="parent_groups",
+        verbose_name=_("member groups"),
+    )
     prefixes = models.ManyToManyField(
         Prefix,
         blank=True,

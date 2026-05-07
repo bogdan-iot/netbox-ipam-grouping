@@ -41,6 +41,9 @@ class GroupTable(NetBoxTable):
         linkify=lambda record: record.application.get_absolute_url() if record.application else None,
         verbose_name="Application",
     )
+    member_group_count = tables.Column(
+        empty_values=(), verbose_name="Member groups", orderable=False
+    )
     prefix_count = tables.Column(empty_values=(), verbose_name="Prefixes", orderable=False)
     ip_count = tables.Column(empty_values=(), verbose_name="IP Addresses", orderable=False)
     range_count = tables.Column(empty_values=(), verbose_name="IP Ranges", orderable=False)
@@ -51,13 +54,16 @@ class GroupTable(NetBoxTable):
         model = Group
         fields = (
             "pk", "name", "owner", "application", "description",
-            "prefix_count", "ip_count", "range_count",
+            "member_group_count", "prefix_count", "ip_count", "range_count",
             "tags", "created", "last_updated", "actions",
         )
         default_columns = (
             "pk", "name", "owner", "application",
-            "prefix_count", "ip_count", "range_count", "tags", "actions",
+            "member_group_count", "prefix_count", "ip_count", "range_count", "actions",
         )
+
+    def render_member_group_count(self, record):
+        return record.member_groups.count()
 
     def render_prefix_count(self, record):
         return record.prefixes.count()
