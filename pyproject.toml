@@ -1,15 +1,15 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
-[project]
-name = "netbox-ipam-grouping"
+[tool.poetry]
+name = "netbox_ipam_grouping"
 version = "1.0.0"
 description = "NetBox plugin to group IPAM objects (IP Addresses, Prefixes, IP Ranges) and assign them to Applications with ownership-scoped editing."
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
 authors = [
-    { name = "Bogdan Radu" }
+    "Bogdan Radu"
 ]
 keywords = ["netbox", "plugin", "ipam", "grouping", "applications", "firewall"]
 classifiers = [
@@ -23,17 +23,20 @@ classifiers = [
     "Framework :: Django",
     "Topic :: System :: Networking",
 ]
-requires-python = ">=3.10"
-
-[project.urls]
-Homepage = "https://github.com/bogdan-iot/netbox-ipam-grouping"
-Repository = "https://github.com/bogdan-iot/netbox-ipam-grouping"
-Issues = "https://github.com/bogdan-iot/netbox-ipam-grouping/issues"
-
-[tool.setuptools.packages.find]
-include = ["netbox_ipam_grouping*"]
-
-[tool.setuptools.package-data]
-netbox_ipam_grouping = [
-    "templates/**/*.html",
+packages = [
+    { include = "netbox_ipam_grouping" }
 ]
+include = [
+    "netbox_ipam_grouping/templates/**/*.html",
+    "netbox_ipam_grouping/migrations/*.py",
+]
+homepage = "https://github.com/bogdan-iot/netbox-ipam-grouping"
+repository = "https://github.com/bogdan-iot/netbox-ipam-grouping"
+documentation = "https://github.com/bogdan-iot/netbox-ipam-grouping"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+netbox = ">=4.5.0"
+
+[tool.poetry.group.dev.dependencies]
+twine = "*"
