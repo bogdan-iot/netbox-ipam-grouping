@@ -1,6 +1,6 @@
 from django import forms
 from django.db.models import Q
-from netbox.forms import NetBoxModelForm
+from netbox.forms import NetBoxModelForm, NetBoxModelBulkEditForm
 from utilities.forms.fields import DynamicModelMultipleChoiceField, DynamicModelChoiceField, SlugField
 
 from ipam.models import Prefix, IPAddress, IPRange
@@ -57,6 +57,27 @@ class ApplicationForm(NetBoxModelForm):
         return _clean_owner(self.cleaned_data.get("owner"))
 
 
+class ApplicationBulkEditForm(NetBoxModelBulkEditForm):
+    model = Application
+
+    owner = DynamicModelChoiceField(
+        queryset=Owner.objects.all(),
+        required=False,
+        label="Owner",
+        selector=True,
+    )
+    description = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Description",
+    )
+
+    fieldsets = (
+        (None, ("owner", "description")),
+    )
+    nullable_fields = ("owner", "description")
+
+
 class GroupForm(NetBoxModelForm):
 
     owner = DynamicModelChoiceField(
@@ -73,9 +94,6 @@ class GroupForm(NetBoxModelForm):
         selector=True,
     )
 
-    # Self-referential M2M — groups that belong to this group.
-    # Filtered by application so only groups from the same application
-    # are available, consistent with the other IPAM object pickers.
     member_groups = DynamicModelMultipleChoiceField(
         queryset=Group.objects.all(),
         required=False,
@@ -136,7 +154,6 @@ class GroupForm(NetBoxModelForm):
                 owner__pk__in=owner_pks
             )
 
-            # Scope member_groups to groups the user owns, excluding self
             member_qs = Group.objects.filter(
                 Q(owner__users=user) |
                 Q(owner__user_groups__in=user.groups.all())
@@ -149,7 +166,6 @@ class GroupForm(NetBoxModelForm):
                 self.fields[field_name].widget.add_query_param("owned_by_user", user.pk)
 
         else:
-            # Admin: exclude self from member_groups
             if self.instance and self.instance.pk:
                 self.fields["member_groups"].queryset = Group.objects.exclude(
                     pk=self.instance.pk
@@ -159,15 +175,25 @@ class GroupForm(NetBoxModelForm):
         return _clean_owner(self.cleaned_data.get("owner"))
 
     def clean(self):
+        has_members = any([
+            self.data.getlist("prefixes"),
+            self.data.getlist("ip_addresses"),
+            self.data.getlist("ip_ranges"),
+            self.data.getlist("member_groups"),
+        ])
+        if not has_members:
+            raise forms.ValidationError(
+                "A group must contain at least one Prefix, IP Address, "
+                "IP Range, or Member group."
+            )
+
         cleaned_data = super().clean()
         if not cleaned_data:
             return cleaned_data
 
-        # Prevent circular membership
         member_groups = cleaned_data.get("member_groups") or []
         if self.instance and self.instance.pk and member_groups:
             for candidate in member_groups:
-                # Walk up through candidate's own parent_groups to detect cycles
                 seen = set()
                 queue = list(candidate.parent_groups.all())
                 while queue:
@@ -205,17 +231,31 @@ class GroupForm(NetBoxModelForm):
                 "the one selected for this group:\n" + "\n".join(mismatched)
             )
 
-        # A group must contain at least one member
-        has_members = any([
-            cleaned_data.get("prefixes"),
-            cleaned_data.get("ip_addresses"),
-            cleaned_data.get("ip_ranges"),
-            cleaned_data.get("member_groups"),
-        ])
-        if not has_members:
-            raise forms.ValidationError(
-                "A group must contain at least one Prefix, IP Address, "
-                "IP Range, or Member group."
-            )
-
         return cleaned_data
+
+
+class GroupBulkEditForm(NetBoxModelBulkEditForm):
+    model = Group
+
+    owner = DynamicModelChoiceField(
+        queryset=Owner.objects.all(),
+        required=False,
+        label="Owner",
+        selector=True,
+    )
+    application = DynamicModelChoiceField(
+        queryset=Application.objects.all(),
+        required=False,
+        label="Application",
+        selector=True,
+    )
+    description = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Description",
+    )
+
+    fieldsets = (
+        (None, ("owner", "application", "description")),
+    )
+    nullable_fields = ("owner", "application", "description")
