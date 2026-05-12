@@ -53,6 +53,223 @@
 
     {% include 'inc/panels/custom_fields.html' with obj=object %}
 
+    {# ── Sync Diff panel ─────────────────────────────────────────────────── #}
+    <div class="card mt-3" id="sync-diff-card" style="display:none;">
+      <h5 class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="mdi mdi-swap-horizontal me-1"></i> Sync Diff</span>
+        <span id="sync-diff-badge"></span>
+      </h5>
+      <div class="card-body p-0">
+        <div id="sync-diff-container"></div>
+      </div>
+    </div>
+
+    <style>
+      .diff-category-header {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6c757d;
+        padding: 0.5rem 1rem 0.25rem;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+        border-bottom: 1px solid #dee2e6;
+      }
+      .diff-category-header:first-child {
+        border-top: none;
+      }
+      .diff-row {
+        display: flex;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .diff-row:last-child {
+        border-bottom: none;
+      }
+      .diff-cell {
+        flex: 1;
+        padding: 0.35rem 1rem;
+        font-family: monospace;
+        font-size: 0.85rem;
+        word-break: break-all;
+        min-width: 0;
+      }
+      .diff-cell + .diff-cell {
+        border-left: 1px solid #dee2e6;
+      }
+      .diff-cell-nb   { background: #fff8f8; color: #c0392b; }
+      .diff-cell-ext  { background: #fffdf0; color: #856404; }
+      .diff-cell-empty { background: #fafafa; }
+      .diff-col-header {
+        display: flex;
+        border-bottom: 1px solid #dee2e6;
+        font-size: 0.78rem;
+        font-weight: 600;
+        background: #fff;
+      }
+      .diff-col-header-cell {
+        flex: 1;
+        padding: 0.4rem 1rem;
+        color: #495057;
+      }
+      .diff-col-header-cell + .diff-col-header-cell {
+        border-left: 1px solid #dee2e6;
+      }
+      .diff-summary {
+        display: flex;
+        gap: 1.25rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #dee2e6;
+        background: #fdfdfd;
+        flex-wrap: wrap;
+      }
+      .diff-summary-item {
+        font-size: 0.82rem;
+        color: #495057;
+      }
+      .diff-summary-count {
+        font-weight: 700;
+        font-size: 1rem;
+      }
+    </style>
+
+    <script>
+    (function () {
+      const rawJson = "{{ object.custom_field_data.sync_diff|default:''|escapejs }}";
+      const card      = document.getElementById('sync-diff-card');
+      const badge     = document.getElementById('sync-diff-badge');
+      const container = document.getElementById('sync-diff-container');
+
+      if (!rawJson) return;   // no diff stored yet — leave card hidden
+
+      card.style.display = '';
+
+      let raw = null;
+      try { raw = JSON.parse(rawJson); } catch (e) { /* fall through */ }
+
+      // ── Error stored by the script ────────────────────────────────────
+      if (!raw || raw.error) {
+        badge.innerHTML = '<span class="badge bg-warning text-dark">Error</span>';
+        container.innerHTML =
+          `<div class="p-3 text-danger">` +
+          `<i class="mdi mdi-alert-circle me-1"></i>${esc(raw?.error || 'Could not parse diff data.')}</div>`;
+        return;
+      }
+
+      // ── In-sync: empty object ─────────────────────────────────────────
+      if (Object.keys(raw).length === 0) {
+        badge.innerHTML = '<span class="badge bg-success">In Sync</span>';
+        container.innerHTML =
+          '<div class="p-3 text-success">' +
+          '<i class="mdi mdi-check-circle me-1"></i>No differences found.</div>';
+        return;
+      }
+
+      // ── Out of sync: render diff ──────────────────────────────────────
+      badge.innerHTML = '<span class="badge bg-danger">Out of Sync</span>';
+
+      const LABELS = {
+        prefixes:      { label: 'Prefixes',      icon: 'mdi-ip-network' },
+        ip_addresses:  { label: 'IP Addresses',  icon: 'mdi-ip'         },
+        ip_ranges:     { label: 'IP Ranges',      icon: 'mdi-arrow-left-right' },
+        member_groups: { label: 'Member Groups',  icon: 'mdi-group'      },
+      };
+
+      // Summary counts
+      let totalNb = 0, totalExt = 0;
+      for (const changes of Object.values(raw)) {
+        totalNb  += (changes.only_in_netbox   || []).length;
+        totalExt += (changes.only_in_external || []).length;
+      }
+
+      let html = `
+        <div class="diff-summary">
+          <div class="diff-summary-item">
+            <span class="diff-summary-count text-danger">${totalNb}</span>
+            <span class="ms-1">only in <strong>NetBox</strong></span>
+          </div>
+          <div class="diff-summary-item">
+            <span class="diff-summary-count text-warning">${totalExt}</span>
+            <span class="ms-1">only in <strong>External</strong></span>
+          </div>
+        </div>
+        <div class="diff-col-header">
+          <div class="diff-col-header-cell">
+            <i class="mdi mdi-database text-primary me-1"></i>Only in NetBox
+          </div>
+          <div class="diff-col-header-cell">
+            <i class="mdi mdi-cloud text-info me-1"></i>Only in External
+          </div>
+        </div>`;
+
+      for (const [key, changes] of Object.entries(raw)) {
+        const meta    = LABELS[key] || { label: key, icon: 'mdi-tag' };
+        const nbOnly  = changes.only_in_netbox   || [];
+        const extOnly = changes.only_in_external || [];
+        const maxRows = Math.max(nbOnly.length, extOnly.length);
+
+        html += `
+          <div class="diff-category-header">
+            <i class="mdi ${meta.icon} me-1"></i>${esc(meta.label)}
+            <span class="ms-2 text-danger">&minus;${nbOnly.length}</span>
+            <span class="ms-1 text-warning">+${extOnly.length}</span>
+          </div>`;
+
+        for (let i = 0; i < maxRows; i++) {
+          const nbVal  = nbOnly[i]  ? `<span class="diff-cell diff-cell-nb">${esc(nbOnly[i])}</span>`   : `<span class="diff-cell diff-cell-empty"></span>`;
+          const extVal = extOnly[i] ? `<span class="diff-cell diff-cell-ext">${esc(extOnly[i])}</span>` : `<span class="diff-cell diff-cell-empty"></span>`;
+          html += `<div class="diff-row">${nbVal}${extVal}</div>`;
+        }
+      }
+
+      container.innerHTML = html;
+
+      function esc(s) {
+        return String(s)
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+          .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      }
+    })();
+    </script>
+    {# ── end Sync Diff panel ─────────────────────────────────────────────── #}
+
+  </div>
+
+  <div class="col col-md-6">
+    <div class="card">
+      <h5 class="card-header">External System</h5>
+      <div class="card-body">
+        <p class="text-muted mb-3">
+          Use <strong>Check Contents</strong> to compare this group with the
+          external system, or <strong>Sync to AppViz</strong> to push the
+          current contents to it.
+        </p>
+        <div class="d-flex gap-2">
+          <button id="check-btn" class="btn btn-secondary" onclick="runScript('check')">
+            <i class="mdi mdi-sync-alert"></i> Check Contents
+          </button>
+
+          <button
+            id="sync-btn"
+            class="btn btn-primary"
+            onclick="runScript('sync')"
+            disabled
+            title="Run 'Check Contents' first to enable syncing"
+            data-sync-status="{{ object.custom_field_data.sync_status|lower|default:'' }}"
+          >
+            <i class="mdi mdi-cloud-upload"></i> Sync to AppViz
+          </button>
+        </div>
+
+        <div id="script-status" class="mt-3" style="display:none;">
+          <div id="script-spinner" class="d-flex align-items-center gap-2 text-muted">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span id="script-message">Please wait&hellip;</span>
+          </div>
+          <div id="script-result" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -163,4 +380,152 @@
     </div>
   </div>
 </div>
+
+<input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+<script>
+const GROUP_ID   = {{ object.pk }};
+const CSRF_TOKEN = document.getElementById('csrf-token').value;
+
+// ── Sync button: enable only when sync_status is exactly "false" ──────────
+(function () {
+  const btn    = document.getElementById('sync-btn');
+  const status = btn.getAttribute('data-sync-status');
+  // Django |lower renders Python False → "false", True → "true", None/unset → ""
+  if (status === 'false') {
+    btn.disabled = false;
+    btn.removeAttribute('title');
+  }
+})();
+
+// ── Script runner ─────────────────────────────────────────────────────────
+const SCRIPTS = {
+    check: {
+        id: 2,   // check_group_sync.CheckGroupSyncScript
+        message: 'Checking group contents against external system\u2026',
+        btnId: 'check-btn',
+        reload: true,
+    },
+    sync: {
+        id: 3,   // sync_group_to_external.SyncGroupToExternalScript — confirm ID after upload
+        message: 'Pushing group contents to external system\u2026',
+        btnId: 'sync-btn',
+        reload: true,
+    },
+};
+
+async function runScript(action) {
+    const cfg = SCRIPTS[action];
+    if (cfg.id === null) {
+        alert('This script is not yet configured.');
+        return;
+    }
+    const btn      = document.getElementById(cfg.btnId);
+    const otherBtn = document.getElementById(action === 'check' ? 'sync-btn' : 'check-btn');
+    const statusDiv  = document.getElementById('script-status');
+    const spinnerDiv = document.getElementById('script-spinner');
+    const msgEl      = document.getElementById('script-message');
+    const resultDiv  = document.getElementById('script-result');
+
+    btn.disabled      = true;
+    otherBtn.disabled = true;
+    statusDiv.style.display  = 'block';
+    spinnerDiv.style.display = 'flex';
+    resultDiv.style.display  = 'none';
+    msgEl.textContent = cfg.message;
+
+    try {
+        const submitResp = await fetch(
+            `/api/extras/scripts/${cfg.id}/`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': CSRF_TOKEN,
+                },
+                body: JSON.stringify({ data: { group: GROUP_ID }, commit: true }),
+            }
+        );
+
+        if (!submitResp.ok) {
+            const err = await submitResp.json();
+            throw new Error(err.detail || JSON.stringify(err));
+        }
+
+        const submitted = await submitResp.json();
+
+        // In NetBox 4.x the POST response wraps the job object under `result`.
+        // Extract the path only so it works regardless of internal hostname.
+        const rawJobUrl = submitted.result?.url;
+        if (!rawJobUrl) throw new Error('No job URL returned from script submission.');
+        const jobUrl = new URL(rawJobUrl).pathname;   // e.g. /api/core/jobs/42/
+
+        msgEl.textContent = 'Waiting for job to complete\u2026';
+        const job = await pollJob(jobUrl);
+
+        spinnerDiv.style.display = 'none';
+        resultDiv.style.display  = 'block';
+
+        const status    = job.status?.value;
+        const isSuccess = status === 'completed';
+        const isError   = status === 'failed' || status === 'errored';
+        const alertClass = isSuccess ? 'alert-success' : isError ? 'alert-danger' : 'alert-warning';
+        const icon       = isSuccess ? 'mdi-check-circle' : isError ? 'mdi-alert-circle' : 'mdi-information';
+        const output     = (job.data?.output || '').trim();
+
+        resultDiv.innerHTML = `
+            <div class="alert ${alertClass} mb-0">
+                <div class="d-flex align-items-start gap-2">
+                    <i class="mdi ${icon} mt-1"></i>
+                    <div>
+                        <strong>${job.status?.label || status}</strong>
+                        ${output
+                            ? `<pre class="mb-0 mt-1" style="font-size:0.85em;white-space:pre-wrap;">${escapeHtml(output)}</pre>`
+                            : ''}
+                    </div>
+                </div>
+            </div>`;
+
+        if (isSuccess && cfg.reload) {
+            setTimeout(() => window.location.reload(), 2000);
+        }
+
+    } catch (err) {
+        spinnerDiv.style.display = 'none';
+        resultDiv.style.display  = 'block';
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger mb-0">
+                <i class="mdi mdi-alert-circle"></i>
+                ${escapeHtml(err.message)}
+            </div>`;
+    } finally {
+        btn.disabled      = false;
+        otherBtn.disabled = false;
+    }
+}
+
+async function pollJob(url, interval = 1500, maxAttempts = 60) {
+    for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(r => setTimeout(r, interval));
+        const resp = await fetch(url, {
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        });
+        if (!resp.ok) throw new Error(`Poll failed: HTTP ${resp.status}`);
+        const job = await resp.json();
+        const s = job.status?.value || job.status;
+        if (['completed', 'failed', 'errored'].includes(s)) return job;
+    }
+    throw new Error('Job timed out after polling.');
+}
+
+function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return m ? decodeURIComponent(m[2]) : '';
+}
+
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
 {% endblock %}

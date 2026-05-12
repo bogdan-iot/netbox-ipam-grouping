@@ -7,10 +7,7 @@ from netbox.views import generic
 from ipam.models import Prefix, IPAddress, IPRange
 
 from .models import Application, Group
-from .forms import (
-    ApplicationForm, ApplicationBulkEditForm,
-    GroupForm, GroupBulkEditForm,
-)
+from .forms import ApplicationForm, GroupForm
 from .tables import ApplicationTable, GroupTable
 from .filtersets import ApplicationFilterSet, GroupFilterSet
 
@@ -112,13 +109,6 @@ class ApplicationChangelogView(generic.ObjectChangeLogView):
     queryset = Application.objects.all()
 
 
-class ApplicationBulkEditView(generic.BulkEditView):
-    queryset = Application.objects.prefetch_related("owner", "tags")
-    filterset = ApplicationFilterSet
-    table = ApplicationTable
-    form = ApplicationBulkEditForm
-
-
 class ApplicationBulkDeleteView(generic.BulkDeleteView):
     queryset = Application.objects.all()
     filterset = ApplicationFilterSet
@@ -202,16 +192,6 @@ class GroupDeleteView(generic.ObjectDeleteView):
 
 class GroupChangelogView(generic.ObjectChangeLogView):
     queryset = Group.objects.all()
-
-
-class GroupBulkEditView(generic.BulkEditView):
-    queryset = Group.objects.prefetch_related(
-        "owner", "application", "member_groups",
-        "prefixes", "ip_addresses", "ip_ranges", "tags",
-    )
-    filterset = GroupFilterSet
-    table = GroupTable
-    form = GroupBulkEditForm
 
 
 class GroupBulkDeleteView(generic.BulkDeleteView):

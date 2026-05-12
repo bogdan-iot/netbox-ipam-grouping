@@ -31,11 +31,6 @@ urlpatterns = [
         name="application_add",
     ),
     path(
-        "applications/edit/",
-        lambda request: _views().ApplicationBulkEditView.as_view()(request),
-        name="application_bulk_edit",
-    ),
-    path(
         "applications/delete/",
         lambda request: _views().ApplicationBulkDeleteView.as_view()(request),
         name="application_bulk_delete",
@@ -73,11 +68,6 @@ urlpatterns = [
         "add/",
         lambda request: _views().GroupCreateView.as_view()(request),
         name="group_add",
-    ),
-    path(
-        "edit/",
-        lambda request: _views().GroupBulkEditView.as_view()(request),
-        name="group_bulk_edit",
     ),
     path(
         "delete/",

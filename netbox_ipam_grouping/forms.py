@@ -1,6 +1,7 @@
+import sys
 from django import forms
 from django.db.models import Q
-from netbox.forms import NetBoxModelForm, NetBoxModelBulkEditForm
+from netbox.forms import NetBoxModelForm
 from utilities.forms.fields import DynamicModelMultipleChoiceField, DynamicModelChoiceField, SlugField
 
 from ipam.models import Prefix, IPAddress, IPRange
@@ -55,27 +56,6 @@ class ApplicationForm(NetBoxModelForm):
 
     def clean_owner(self):
         return _clean_owner(self.cleaned_data.get("owner"))
-
-
-class ApplicationBulkEditForm(NetBoxModelBulkEditForm):
-    model = Application
-
-    owner = DynamicModelChoiceField(
-        queryset=Owner.objects.all(),
-        required=False,
-        label="Owner",
-        selector=True,
-    )
-    description = forms.CharField(
-        max_length=200,
-        required=False,
-        label="Description",
-    )
-
-    fieldsets = (
-        (None, ("owner", "description")),
-    )
-    nullable_fields = ("owner", "description")
 
 
 class GroupForm(NetBoxModelForm):
@@ -175,6 +155,10 @@ class GroupForm(NetBoxModelForm):
         return _clean_owner(self.cleaned_data.get("owner"))
 
     def clean(self):
+        # Read raw POST data to check for members — we cannot rely on
+        # cleaned_data here because super().clean() returns None/empty
+        # when field-level errors exist (e.g. M2M fields absent from POST).
+        # self.data always contains the raw submitted values regardless.
         has_members = any([
             self.data.getlist("prefixes"),
             self.data.getlist("ip_addresses"),
@@ -191,6 +175,7 @@ class GroupForm(NetBoxModelForm):
         if not cleaned_data:
             return cleaned_data
 
+        # Prevent circular membership
         member_groups = cleaned_data.get("member_groups") or []
         if self.instance and self.instance.pk and member_groups:
             for candidate in member_groups:
@@ -232,30 +217,3 @@ class GroupForm(NetBoxModelForm):
             )
 
         return cleaned_data
-
-
-class GroupBulkEditForm(NetBoxModelBulkEditForm):
-    model = Group
-
-    owner = DynamicModelChoiceField(
-        queryset=Owner.objects.all(),
-        required=False,
-        label="Owner",
-        selector=True,
-    )
-    application = DynamicModelChoiceField(
-        queryset=Application.objects.all(),
-        required=False,
-        label="Application",
-        selector=True,
-    )
-    description = forms.CharField(
-        max_length=200,
-        required=False,
-        label="Description",
-    )
-
-    fieldsets = (
-        (None, ("owner", "application", "description")),
-    )
-    nullable_fields = ("owner", "application", "description")

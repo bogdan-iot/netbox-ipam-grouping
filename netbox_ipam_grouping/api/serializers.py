@@ -1,6 +1,8 @@
 from netbox.api.serializers import NetBoxModelSerializer
 from rest_framework import serializers
 
+from ipam.api.serializers import PrefixSerializer, IPAddressSerializer, IPRangeSerializer
+
 from ..models import Application, Group
 
 
@@ -23,6 +25,10 @@ class GroupSerializer(NetBoxModelSerializer):
         view_name="plugins-api:netbox_ipam_grouping-api:group-detail"
     )
 
+    prefixes = PrefixSerializer(nested=True, many=True, read_only=True)
+    ip_addresses = IPAddressSerializer(nested=True, many=True, read_only=True)
+    ip_ranges = IPRangeSerializer(nested=True, many=True, read_only=True)
+
     ip_addresses_count = serializers.IntegerField(read_only=True)
     prefixes_count = serializers.IntegerField(read_only=True)
     ip_ranges_count = serializers.IntegerField(read_only=True)
@@ -33,7 +39,7 @@ class GroupSerializer(NetBoxModelSerializer):
             "id", "url", "display", "name", "description",
             "owner", "application",
             "member_groups",
-            "ip_addresses", "prefixes", "ip_ranges",
+            "prefixes", "ip_addresses", "ip_ranges",
             "ip_addresses_count", "prefixes_count", "ip_ranges_count",
             "tags", "custom_fields", "created", "last_updated",
         )
