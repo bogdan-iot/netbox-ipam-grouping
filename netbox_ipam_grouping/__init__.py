@@ -8,7 +8,7 @@ class NetboxIpamGroupingConfig(PluginConfig):
         "Group IP addresses, prefixes, and IP ranges into named groups "
         "and assign them to applications, with ownership-scoped editing."
     )
-    version = "1.0.1"
+    version = "1.0.2"
     author = "Bogdan Radu"
     author_email = "bogdan@iot-elite.com"
     base_url = "ipam-grouping"
