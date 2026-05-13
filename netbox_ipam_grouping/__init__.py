@@ -19,6 +19,8 @@ class NetboxIpamGroupingConfig(PluginConfig):
 
     def ready(self):
         super().ready()
+
+        # Patch IPAM viewset filtersets with ownership-scoped versions
         from ipam.api.views import PrefixViewSet, IPAddressViewSet, IPRangeViewSet
         from .api.extensions import (
             ScopedPrefixFilterSet,
@@ -28,6 +30,13 @@ class NetboxIpamGroupingConfig(PluginConfig):
         PrefixViewSet.filterset_class = ScopedPrefixFilterSet
         IPAddressViewSet.filterset_class = ScopedIPAddressFilterSet
         IPRangeViewSet.filterset_class = ScopedIPRangeFilterSet
+
+        # Register search indexes so Applications and Groups appear in
+        # NetBox's global search
+        from netbox.search import register_search
+        from .search import ApplicationIndex, GroupIndex
+        register_search(ApplicationIndex)
+        register_search(GroupIndex)
 
 
 config = NetboxIpamGroupingConfig

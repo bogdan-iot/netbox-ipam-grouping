@@ -7,7 +7,7 @@ from netbox.views import generic
 from ipam.models import Prefix, IPAddress, IPRange
 
 from .models import Application, Group
-from .forms import ApplicationForm, GroupForm
+from .forms import ApplicationForm, GroupForm, ApplicationFilterForm, GroupFilterForm
 from .tables import ApplicationTable, GroupTable
 from .filtersets import ApplicationFilterSet, GroupFilterSet
 
@@ -39,6 +39,7 @@ class ApplicationListView(generic.ObjectListView):
     queryset = Application.objects.prefetch_related("owner", "tags")
     table = ApplicationTable
     filterset = ApplicationFilterSet
+    filterset_form = ApplicationFilterForm
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -127,6 +128,7 @@ class GroupListView(generic.ObjectListView):
     )
     table = GroupTable
     filterset = GroupFilterSet
+    filterset_form = GroupFilterForm
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

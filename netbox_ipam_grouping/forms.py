@@ -1,8 +1,14 @@
 import sys
 from django import forms
 from django.db.models import Q
-from netbox.forms import NetBoxModelForm
-from utilities.forms.fields import DynamicModelMultipleChoiceField, DynamicModelChoiceField, SlugField
+from netbox.forms import NetBoxModelForm, NetBoxModelFilterSetForm
+from utilities.forms import FieldSet
+from utilities.forms.fields import (
+    DynamicModelMultipleChoiceField,
+    DynamicModelChoiceField,
+    SlugField,
+    TagFilterField,
+)
 
 from ipam.models import Prefix, IPAddress, IPRange
 from users.models import Owner
@@ -32,6 +38,10 @@ def _clean_owner(val):
     except (Owner.DoesNotExist, ValueError, TypeError):
         raise forms.ValidationError("Select a valid owner.")
 
+
+# ------------------------------------------------------------------
+# Create / Edit forms
+# ------------------------------------------------------------------
 
 class ApplicationForm(NetBoxModelForm):
 
@@ -155,10 +165,6 @@ class GroupForm(NetBoxModelForm):
         return _clean_owner(self.cleaned_data.get("owner"))
 
     def clean(self):
-        # Read raw POST data to check for members — we cannot rely on
-        # cleaned_data here because super().clean() returns None/empty
-        # when field-level errors exist (e.g. M2M fields absent from POST).
-        # self.data always contains the raw submitted values regardless.
         has_members = any([
             self.data.getlist("prefixes"),
             self.data.getlist("ip_addresses"),
@@ -175,7 +181,6 @@ class GroupForm(NetBoxModelForm):
         if not cleaned_data:
             return cleaned_data
 
-        # Prevent circular membership
         member_groups = cleaned_data.get("member_groups") or []
         if self.instance and self.instance.pk and member_groups:
             for candidate in member_groups:
@@ -217,3 +222,42 @@ class GroupForm(NetBoxModelForm):
             )
 
         return cleaned_data
+
+
+# ------------------------------------------------------------------
+# Filter forms (used by the list views' filter panel)
+# ------------------------------------------------------------------
+
+class ApplicationFilterForm(NetBoxModelFilterSetForm):
+    model = Application
+    fieldsets = (
+        FieldSet('q', 'filter_id', 'tag'),
+        FieldSet('owner_id', name='Ownership'),
+    )
+
+    owner_id = DynamicModelMultipleChoiceField(
+        queryset=Owner.objects.all(),
+        required=False,
+        label='Owner',
+    )
+    tag = TagFilterField(Application)
+
+
+class GroupFilterForm(NetBoxModelFilterSetForm):
+    model = Group
+    fieldsets = (
+        FieldSet('q', 'filter_id', 'tag'),
+        FieldSet('owner_id', 'application_id', name='Assignment'),
+    )
+
+    owner_id = DynamicModelMultipleChoiceField(
+        queryset=Owner.objects.all(),
+        required=False,
+        label='Owner',
+    )
+    application_id = DynamicModelMultipleChoiceField(
+        queryset=Application.objects.all(),
+        required=False,
+        label='Application',
+    )
+    tag = TagFilterField(Group)
