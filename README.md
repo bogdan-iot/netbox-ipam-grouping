@@ -37,12 +37,50 @@ python netbox/manage.py migrate netbox_ipam_grouping
 
 ## Custom Field Setup
 
-This plugin expects a custom field named `ipam_application` of type **Object** pointing to `netbox_ipam_grouping | application`, assigned to:
-- `ipam | ip address`
-- `ipam | prefix`
-- `ipam | ip range`
+This plugin expects the following custom fields:
 
-Create this in NetBox under **Customization → Custom Fields** before using the IPAM object pickers in Groups.
+1. - Name: `ipam_application`:
+   - Object types:
+     - `ipam | ip address`
+     - `ipam | prefix`
+     - `ipam | ip range`
+   - Label: `Application`
+   - Group name: `AppViz`
+   - Type: `Object`
+   - Related object type: `IPAM Grouping And Applications > Application`
+   - UI visible: `If set`
+   - UI editable: `Yes`
+
+
+2. - Name: `appviz_diff`
+   - Object types:
+     - `IPAM Grouping And Applications > Group`
+   - Group name: `AppViz`
+   - Type: `Text`
+   - UI visible: `Hidden`
+   - UI editable: `No`
+
+
+3. - Name: `appviz_sync`:
+   - Object types:
+     - `IPAM Grouping And Applications > Group`
+   - Label: `Synced with AppViz`
+   - Group name: `AppViz`
+   - Type: `Boolean (true/false)`
+   - Default value: `false`
+   - UI visible: `Always`
+   - UI editable: `No`
+
+ 
+4. - Name: `appviz_object_id`:
+   - Object types:
+     - `IPAM Grouping And Applications > Group`
+   - Label: `AppViz object_id`
+   - Group name: `AppViz`
+   - Type: `Integer`
+   - UI visible: `If set`
+   - UI editable: `Yes`
+
 
 ## Navigation
 
