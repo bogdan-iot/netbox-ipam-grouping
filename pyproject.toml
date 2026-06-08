@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "netbox_ipam_grouping"
-version = "1.0.3"
+version = "1.0.4"
 description = "NetBox plugin to group IPAM objects (IP Addresses, Prefixes, IP Ranges) and assign them to Applications with ownership-scoped editing."
 readme = "README.md"
 license = "Apache-2.0"
