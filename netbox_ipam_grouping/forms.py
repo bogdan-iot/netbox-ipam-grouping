@@ -2,7 +2,8 @@ import sys
 from django import forms
 from django.db.models import Q
 from netbox.forms import NetBoxModelForm, NetBoxModelFilterSetForm
-from utilities.forms import FieldSet
+from netbox.forms import NetBoxModelBulkEditForm
+from utilities.forms.rendering import FieldSet
 from utilities.forms.fields import (
     DynamicModelMultipleChoiceField,
     DynamicModelChoiceField,
@@ -13,7 +14,7 @@ from utilities.forms.fields import (
 from ipam.models import Prefix, IPAddress, IPRange
 from users.models import Owner
 from .models import Application, Group
-
+from .utils import has_unrestricted_permission
 
 def _scoped_owner_field(user):
     owner_objects = list(
@@ -62,13 +63,19 @@ class ApplicationForm(NetBoxModelForm):
         super().__init__(*args, **kwargs)
         user = self.request.user if self.request else None
         if user and not user.is_superuser:
-            self.fields["owner"] = _scoped_owner_field(user)
+            if not has_unrestricted_permission(self.request, 'view', 'users', 'owner'):
+                self.fields["owner"] = _scoped_owner_field(user)
 
     def clean_owner(self):
         return _clean_owner(self.cleaned_data.get("owner"))
 
 
 class GroupForm(NetBoxModelForm):
+
+    name = forms.CharField(
+        max_length=200,
+        help_text="Don't include G_ , e.g. 'App1-Servers-Prod'",
+    )
 
     owner = DynamicModelChoiceField(
         queryset=Owner.objects.all(),
@@ -131,8 +138,13 @@ class GroupForm(NetBoxModelForm):
         super().__init__(*args, **kwargs)
         user = self.request.user if self.request else None
 
+        # Hide AppViz custom fields that can't be modified.
+        for field in ('cf_appviz_diff', 'cf_appviz_sync'):
+            self.fields.pop(field, None)
+            # self.custom_fields.pop(field, None)
+
         if user and not user.is_superuser:
-            self.fields["owner"] = _scoped_owner_field(user)
+            self.fields.pop('cf_appviz_object_id', None)
 
             owner_pks = list(
                 Owner._default_manager.filter(
@@ -140,20 +152,47 @@ class GroupForm(NetBoxModelForm):
                 ).distinct().values_list("pk", flat=True)
             )
 
-            self.fields["application"].queryset = Application.objects.filter(
-                owner__pk__in=owner_pks
-            )
+            if not has_unrestricted_permission(self.request, 'view', 'users', 'owner'):
+                self.fields["owner"] = _scoped_owner_field(user)
+                if self.instance and self.instance.pk and self.instance.owner_id:
+                    existing = Owner._default_manager.filter(pk=self.instance.owner_id).first()
+                    if existing:
+                        current_choices = list(self.fields["owner"].choices)
+                        pks = [str(pk) for pk, _ in current_choices]
+                        if str(existing.pk) not in pks:
+                            self.fields["owner"].choices = current_choices + [
+                                (str(existing.pk), existing.name)
+                            ]
+            else:
+                # Explicitly set the initial value for users with unrestricted access
+                if self.instance and self.instance.pk and self.instance.owner_id:
+                    self.fields["owner"].initial = self.instance.owner_id
 
-            member_qs = Group.objects.filter(
-                Q(owner__users=user) |
-                Q(owner__user_groups__in=user.groups.all())
-            ).distinct()
+            if not has_unrestricted_permission(self.request, 'view', 'netbox_ipam_grouping', 'application'):
+                app_qs = Application.objects.filter(owner__pk__in=owner_pks)
+                if self.instance and self.instance.pk and self.instance.application_id:
+                    app_qs = app_qs | Application.objects.filter(pk=self.instance.application_id)
+                self.fields["application"].queryset = app_qs.distinct()
+
+            if not has_unrestricted_permission(self.request, 'view', 'netbox_ipam_grouping', 'group'):
+                member_qs = Group.objects.filter(
+                    Q(owner__users=user) |
+                    Q(owner__user_groups__in=user.groups.all())
+                ).distinct()
+            else:
+                member_qs = Group.objects.all()
             if self.instance and self.instance.pk:
                 member_qs = member_qs.exclude(pk=self.instance.pk)
             self.fields["member_groups"].queryset = member_qs
 
-            for field_name in ("prefixes", "ip_addresses", "ip_ranges"):
-                self.fields[field_name].widget.add_query_param("owned_by_user", user.pk)
+            if not has_unrestricted_permission(self.request, 'view', 'ipam', 'prefix'):
+                self.fields["prefixes"].widget.add_query_param("owned_by_user", user.pk)
+
+            if not has_unrestricted_permission(self.request, 'view', 'ipam', 'ipaddress'):
+                self.fields["ip_addresses"].widget.add_query_param("owned_by_user", user.pk)
+
+            if not has_unrestricted_permission(self.request, 'view', 'ipam', 'iprange'):
+                self.fields["ip_ranges"].widget.add_query_param("owned_by_user", user.pk)
 
         else:
             if self.instance and self.instance.pk:
@@ -222,6 +261,52 @@ class GroupForm(NetBoxModelForm):
             )
 
         return cleaned_data
+
+
+class ApplicationBulkEditForm(NetBoxModelBulkEditForm):
+    model = Application
+
+    owner = DynamicModelChoiceField(
+        queryset=Owner.objects.all(),
+        required=False,
+        label='Owner',
+    )
+    description = forms.CharField(
+        max_length=200,
+        required=False,
+        label='Description',
+    )
+
+    nullable_fields = ('description', 'owner')
+
+
+class GroupBulkEditForm(NetBoxModelBulkEditForm):
+    model = Group
+
+    owner = DynamicModelChoiceField(
+        queryset=Owner.objects.all(),
+        required=False,
+        label='Owner',
+    )
+    application = DynamicModelChoiceField(
+        queryset=Application.objects.all(),
+        required=False,
+        label='Application',
+    )
+    description = forms.CharField(
+        max_length=200,
+        required=False,
+        label='Description',
+    )
+
+    nullable_fields = ('description', 'owner', 'application')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in ('cf_appviz_diff', 'cf_appviz_object_id', 'cf_appviz_sync'):
+            self.custom_fields.pop(field, None)
+            self.fields.pop(field, None)
+        self.custom_field_groups.pop('AppViz', None)
 
 
 # ------------------------------------------------------------------

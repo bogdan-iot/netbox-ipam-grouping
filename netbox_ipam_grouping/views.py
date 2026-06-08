@@ -3,14 +3,24 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 
 from netbox.views import generic
+from users.models import ObjectPermission
 
 from ipam.models import Prefix, IPAddress, IPRange
 
 from .models import Application, Group
-from .forms import ApplicationForm, GroupForm, ApplicationFilterForm, GroupFilterForm
+from .utils import has_unrestricted_permission
+from .forms import (
+    ApplicationForm, GroupForm,
+    ApplicationFilterForm, GroupFilterForm,
+    ApplicationBulkEditForm, GroupBulkEditForm,
+)
 from .tables import ApplicationTable, GroupTable
 from .filtersets import ApplicationFilterSet, GroupFilterSet
 
+
+# ------------------------------------------------------------------
+# Shared helpers
+# ------------------------------------------------------------------
 
 def _user_owns(obj, user):
     if not obj.owner:
@@ -31,6 +41,14 @@ def _inject_request(form_class, request):
     return form_with_request
 
 
+def _ownership_filter(qs, user):
+    """Filter a queryset to objects owned by the given user."""
+    return qs.filter(
+        Q(owner__users=user) |
+        Q(owner__user_groups__in=user.groups.all())
+    ).distinct()
+
+
 # ------------------------------------------------------------------
 # Application views
 # ------------------------------------------------------------------
@@ -45,10 +63,9 @@ class ApplicationListView(generic.ObjectListView):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
-        return qs.filter(
-            Q(owner__users=request.user) |
-            Q(owner__user_groups__in=request.user.groups.all())
-        ).distinct()
+        if has_unrestricted_permission(request, 'view', 'netbox_ipam_grouping', 'application'):
+            return qs
+        return _ownership_filter(qs, request.user)
 
 
 class ApplicationView(generic.ObjectView):
@@ -87,9 +104,11 @@ class ApplicationEditView(generic.ObjectEditView):
 
     def dispatch(self, request, *args, **kwargs):
         obj = get_object_or_404(Application, pk=kwargs["pk"])
-        if not request.user.is_superuser and not _user_owns(obj, request.user):
-            messages.error(request, "You do not have permission to edit this application.")
-            return redirect(obj.get_absolute_url())
+        if not request.user.is_superuser:
+            if not has_unrestricted_permission(request, 'change', 'netbox_ipam_grouping', 'application'):
+                if not _user_owns(obj, request.user):
+                    messages.error(request, "You do not have permission to edit this application.")
+                    return redirect(obj.get_absolute_url())
         self.form = _inject_request(ApplicationForm, request)
         return super().dispatch(request, *args, **kwargs)
 
@@ -100,9 +119,11 @@ class ApplicationDeleteView(generic.ObjectDeleteView):
 
     def dispatch(self, request, *args, **kwargs):
         obj = get_object_or_404(Application, pk=kwargs["pk"])
-        if not request.user.is_superuser and not _user_owns(obj, request.user):
-            messages.error(request, "You do not have permission to delete this application.")
-            return redirect(obj.get_absolute_url())
+        if not request.user.is_superuser:
+            if not has_unrestricted_permission(request, 'delete', 'netbox_ipam_grouping', 'application'):
+                if not _user_owns(obj, request.user):
+                    messages.error(request, "You do not have permission to delete this application.")
+                    return redirect(obj.get_absolute_url())
         return super().dispatch(request, *args, **kwargs)
 
 
@@ -115,6 +136,13 @@ class ApplicationBulkDeleteView(generic.BulkDeleteView):
     filterset = ApplicationFilterSet
     table = ApplicationTable
     default_return_url = "plugins:netbox_ipam_grouping:application_list"
+
+
+class ApplicationBulkEditView(generic.BulkEditView):
+    queryset = Application.objects.prefetch_related('owner', 'tags')
+    filterset = ApplicationFilterSet
+    table = ApplicationTable
+    form = ApplicationBulkEditForm
 
 
 # ------------------------------------------------------------------
@@ -134,10 +162,9 @@ class GroupListView(generic.ObjectListView):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
-        return qs.filter(
-            Q(owner__users=request.user) |
-            Q(owner__user_groups__in=request.user.groups.all())
-        ).distinct()
+        if has_unrestricted_permission(request, 'view', 'netbox_ipam_grouping', 'group'):
+            return qs
+        return _ownership_filter(qs, request.user)
 
 
 class GroupView(generic.ObjectView):
@@ -173,9 +200,11 @@ class GroupEditView(generic.ObjectEditView):
 
     def dispatch(self, request, *args, **kwargs):
         obj = get_object_or_404(Group, pk=kwargs["pk"])
-        if not request.user.is_superuser and not _user_owns(obj, request.user):
-            messages.error(request, "You do not have permission to edit this group.")
-            return redirect(obj.get_absolute_url())
+        if not request.user.is_superuser:
+            if not has_unrestricted_permission(request, 'change', 'netbox_ipam_grouping', 'group'):
+                if not _user_owns(obj, request.user):
+                    messages.error(request, "You do not have permission to edit this group.")
+                    return redirect(obj.get_absolute_url())
         self.form = _inject_request(GroupForm, request)
         return super().dispatch(request, *args, **kwargs)
 
@@ -186,9 +215,11 @@ class GroupDeleteView(generic.ObjectDeleteView):
 
     def dispatch(self, request, *args, **kwargs):
         obj = get_object_or_404(Group, pk=kwargs["pk"])
-        if not request.user.is_superuser and not _user_owns(obj, request.user):
-            messages.error(request, "You do not have permission to delete this group.")
-            return redirect(obj.get_absolute_url())
+        if not request.user.is_superuser:
+            if not has_unrestricted_permission(request, 'delete', 'netbox_ipam_grouping', 'group'):
+                if not _user_owns(obj, request.user):
+                    messages.error(request, "You do not have permission to delete this group.")
+                    return redirect(obj.get_absolute_url())
         return super().dispatch(request, *args, **kwargs)
 
 
@@ -201,3 +232,13 @@ class GroupBulkDeleteView(generic.BulkDeleteView):
     filterset = GroupFilterSet
     table = GroupTable
     default_return_url = "plugins:netbox_ipam_grouping:group_list"
+
+
+class GroupBulkEditView(generic.BulkEditView):
+    queryset = Group.objects.prefetch_related(
+        'owner', 'application', 'member_groups',
+        'prefixes', 'ip_addresses', 'ip_ranges', 'tags',
+    )
+    filterset = GroupFilterSet
+    table = GroupTable
+    form = GroupBulkEditForm

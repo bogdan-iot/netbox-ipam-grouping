@@ -135,7 +135,7 @@
 
     <script>
     (function () {
-      const rawJson = "{{ object.custom_field_data.sync_diff|default:''|escapejs }}";
+      const rawJson = "{{ object.custom_field_data.appviz_diff|default:''|escapejs }}";
       const card      = document.getElementById('sync-diff-card');
       const badge     = document.getElementById('sync-diff-badge');
       const container = document.getElementById('sync-diff-container');
@@ -255,7 +255,7 @@
             onclick="runScript('sync')"
             disabled
             title="Run 'Check Contents' first to enable syncing"
-            data-sync-status="{{ object.custom_field_data.sync_status|lower|default:'' }}"
+            data-sync-status="{{ object.custom_field_data.appviz_sync|lower|default:'' }}"
           >
             <i class="mdi mdi-cloud-upload"></i> Sync to AppViz
           </button>
@@ -391,7 +391,7 @@ const CSRF_TOKEN = document.getElementById('csrf-token').value;
   const btn    = document.getElementById('sync-btn');
   const status = btn.getAttribute('data-sync-status');
   // Django |lower renders Python False → "false", True → "true", None/unset → ""
-  if (status === 'false') {
+  if (status !== 'true') {
     btn.disabled = false;
     btn.removeAttribute('title');
   }
@@ -409,7 +409,7 @@ const SCRIPTS = {
         id: 3,   // sync_group_to_external.SyncGroupToExternalScript — confirm ID after upload
         message: 'Pushing group contents to external system\u2026',
         btnId: 'sync-btn',
-        reload: true,
+        reload: false,
     },
 };
 
