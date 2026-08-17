@@ -87,6 +87,11 @@ urlpatterns = [
     path(
         "import/",
         lambda request: _views().GroupBulkImportView.as_view()(request),
+        name="group_bulk_import",
+    ),
+    path(
+        "import/",
+        lambda request: _views().GroupBulkImportView.as_view()(request),
         name="group_import",
     ),
     path(
