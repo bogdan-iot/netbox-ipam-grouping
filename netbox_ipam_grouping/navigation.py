@@ -38,6 +38,13 @@ menu = PluginMenu(
                             color=ButtonColorChoices.GREEN,
                             permissions=["netbox_ipam_grouping.add_group"],
                         ),
+                        PluginMenuButton(
+                            link="plugins:netbox_ipam_grouping:group_import",
+                            title="Import",
+                            icon_class="mdi mdi-upload",
+                            color=ButtonColorChoices.CYAN,
+                            permissions=["netbox_ipam_grouping.add_group"],
+                        ),
                     ),
                 ),
             ),

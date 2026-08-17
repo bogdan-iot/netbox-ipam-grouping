@@ -13,6 +13,7 @@ from .forms import (
     ApplicationForm, GroupForm,
     ApplicationFilterForm, GroupFilterForm,
     ApplicationBulkEditForm, GroupBulkEditForm,
+    GroupImportForm,
 )
 from .tables import ApplicationTable, GroupTable
 from .filtersets import ApplicationFilterSet, GroupFilterSet
@@ -242,3 +243,10 @@ class GroupBulkEditView(generic.BulkEditView):
     filterset = GroupFilterSet
     table = GroupTable
     form = GroupBulkEditForm
+
+
+class GroupBulkImportView(generic.BulkImportView):
+    queryset = Group.objects.all()
+    model_form = GroupImportForm
+    table = GroupTable
+    default_return_url = "plugins:netbox_ipam_grouping:group_list"

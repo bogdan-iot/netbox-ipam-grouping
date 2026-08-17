@@ -85,6 +85,11 @@ urlpatterns = [
         name="group_bulk_delete",
     ),
     path(
+        "import/",
+        lambda request: _views().GroupBulkImportView.as_view()(request),
+        name="group_import",
+    ),
+    path(
         "<int:pk>/",
         lambda request, pk: _views().GroupView.as_view()(request, pk=pk),
         name="group",

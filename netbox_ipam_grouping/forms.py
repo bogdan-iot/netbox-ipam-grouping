@@ -2,13 +2,14 @@ import sys
 from django import forms
 from django.db.models import Q
 from netbox.forms import NetBoxModelForm, NetBoxModelFilterSetForm
-from netbox.forms import NetBoxModelBulkEditForm
+from netbox.forms import NetBoxModelBulkEditForm, NetBoxModelImportForm
 from utilities.forms.rendering import FieldSet
 from utilities.forms.fields import (
     DynamicModelMultipleChoiceField,
     DynamicModelChoiceField,
     SlugField,
     TagFilterField,
+    CSVModelChoiceField,
 )
 
 from ipam.models import Prefix, IPAddress, IPRange
@@ -346,3 +347,149 @@ class GroupFilterForm(NetBoxModelFilterSetForm):
         label='Application',
     )
     tag = TagFilterField(Group)
+
+
+# ------------------------------------------------------------------
+# Import forms
+# ------------------------------------------------------------------
+
+class GroupImportForm(NetBoxModelImportForm):
+
+    owner = CSVModelChoiceField(
+        queryset=Owner.objects.all(),
+        to_field_name='name',
+        required=True,
+        help_text='Owner name',
+    )
+
+    application = CSVModelChoiceField(
+        queryset=Application.objects.all(),
+        to_field_name='name',
+        required=True,
+        help_text='Application name',
+    )
+
+    # NetBox's CSV import machinery has no built-in field for M2M
+    # relations, so these are plain comma-separated value fields that
+    # get resolved to real objects in the clean_<field>() methods below
+    # and assigned in save().
+    member_groups = forms.CharField(
+        required=False,
+        help_text='Comma-separated list of member group names',
+    )
+    prefixes = forms.CharField(
+        required=False,
+        help_text='Comma-separated list of prefixes, e.g. "10.0.0.0/24,10.0.1.0/24"',
+    )
+    ip_addresses = forms.CharField(
+        required=False,
+        help_text='Comma-separated list of IP addresses, e.g. "10.0.0.1/32,10.0.0.2/32"',
+    )
+    ip_ranges = forms.CharField(
+        required=False,
+        help_text='Comma-separated list of IP range start addresses, e.g. "10.0.0.10,10.0.0.20"',
+    )
+
+    class Meta:
+        model = Group
+        fields = ('name', 'description', 'owner', 'application', 'tags')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # AppViz custom fields are populated by an external sync and are
+        # never user-editable, same as in GroupForm / GroupBulkEditForm.
+        for field in ('cf_appviz_diff', 'cf_appviz_object_id', 'cf_appviz_sync'):
+            self.custom_fields.pop(field, None)
+            self.fields.pop(field, None)
+        self.custom_field_groups.pop('AppViz', None)
+
+    @staticmethod
+    def _split(value):
+        return [v.strip() for v in value.split(',') if v.strip()] if value else []
+
+    def clean_member_groups(self):
+        resolved = []
+        for name in self._split(self.cleaned_data.get('member_groups')):
+            try:
+                resolved.append(Group.objects.get(name=name))
+            except Group.DoesNotExist:
+                raise forms.ValidationError(f"Member group '{name}' not found.")
+        return resolved
+
+    def clean_prefixes(self):
+        resolved = []
+        for value in self._split(self.cleaned_data.get('prefixes')):
+            try:
+                resolved.append(Prefix.objects.get(prefix=value))
+            except Prefix.DoesNotExist:
+                raise forms.ValidationError(f"Prefix '{value}' not found.")
+            except Prefix.MultipleObjectsReturned:
+                raise forms.ValidationError(
+                    f"Prefix '{value}' is ambiguous (exists in multiple VRFs)."
+                )
+        return resolved
+
+    def clean_ip_addresses(self):
+        resolved = []
+        for value in self._split(self.cleaned_data.get('ip_addresses')):
+            try:
+                resolved.append(IPAddress.objects.get(address=value))
+            except IPAddress.DoesNotExist:
+                raise forms.ValidationError(f"IP address '{value}' not found.")
+            except IPAddress.MultipleObjectsReturned:
+                raise forms.ValidationError(
+                    f"IP address '{value}' is ambiguous (exists in multiple VRFs)."
+                )
+        return resolved
+
+    def clean_ip_ranges(self):
+        resolved = []
+        for value in self._split(self.cleaned_data.get('ip_ranges')):
+            try:
+                resolved.append(IPRange.objects.get(start_address=value))
+            except IPRange.DoesNotExist:
+                raise forms.ValidationError(f"IP range starting at '{value}' not found.")
+            except IPRange.MultipleObjectsReturned:
+                raise forms.ValidationError(
+                    f"IP range starting at '{value}' is ambiguous (exists in multiple VRFs)."
+                )
+        return resolved
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data:
+            return cleaned_data
+
+        has_members = any([
+            cleaned_data.get('member_groups'),
+            cleaned_data.get('prefixes'),
+            cleaned_data.get('ip_addresses'),
+            cleaned_data.get('ip_ranges'),
+        ])
+        if not has_members:
+            raise forms.ValidationError(
+                "A group must contain at least one Prefix, IP Address, "
+                "IP Range, or Member group."
+            )
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        original_save_m2m = self.save_m2m
+
+        def _save_m2m():
+            # Preserve NetBox's own handling of 'tags' (and any other
+            # standard model m2m field), then layer on our custom ones.
+            original_save_m2m()
+            instance.member_groups.set(self.cleaned_data.get('member_groups') or [])
+            instance.prefixes.set(self.cleaned_data.get('prefixes') or [])
+            instance.ip_addresses.set(self.cleaned_data.get('ip_addresses') or [])
+            instance.ip_ranges.set(self.cleaned_data.get('ip_ranges') or [])
+
+        self.save_m2m = _save_m2m
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+
+        return instance
