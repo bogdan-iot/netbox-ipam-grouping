@@ -145,7 +145,7 @@ class GroupForm(NetBoxModelForm):
             # self.custom_fields.pop(field, None)
 
         if user and not user.is_superuser:
-            self.fields.pop('cf_appviz_object_id', None)
+            # self.fields.pop('cf_appviz_object_id', None)
 
             owner_pks = list(
                 Owner._default_manager.filter(
@@ -154,6 +154,7 @@ class GroupForm(NetBoxModelForm):
             )
 
             if not has_unrestricted_permission(self.request, 'view', 'users', 'owner'):
+                self.fields.pop('cf_appviz_object_id', None)
                 self.fields["owner"] = _scoped_owner_field(user)
                 if self.instance and self.instance.pk and self.instance.owner_id:
                     existing = Owner._default_manager.filter(pk=self.instance.owner_id).first()

@@ -4,8 +4,8 @@ from django.shortcuts import get_object_or_404, redirect
 
 from netbox.views import generic
 from users.models import ObjectPermission
-
 from ipam.models import Prefix, IPAddress, IPRange
+from extras.models import Script
 
 from .models import Application, Group
 from .utils import has_unrestricted_permission
@@ -175,12 +175,17 @@ class GroupView(generic.ObjectView):
     )
 
     def get_extra_context(self, request, instance):
+        check_script = Script.objects.filter(name='CheckGroupSyncScript').first()
+        sync_script = Script.objects.filter(name='SyncGroupToExternalScript').first()
+
         return {
             "ip_addresses": instance.ip_addresses.order_by("address"),
-            "prefixes": instance.prefixes.order_by("prefix"),
+            "prefixes": instance.prefixes.select_related("_site").order_by("prefix"),
             "ip_ranges": instance.ip_ranges.order_by("start_address"),
             "member_groups": instance.member_groups.prefetch_related("owner").order_by("name"),
             "parent_groups": instance.parent_groups.prefetch_related("owner").order_by("name"),
+            "check_script_id": check_script.pk if check_script else None,
+            "sync_script_id": sync_script.pk if sync_script else None,
         }
 
 

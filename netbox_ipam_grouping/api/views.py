@@ -69,6 +69,7 @@ class GroupViewSet(NetBoxModelViewSet):
             return qs
 
         action = ACTION_MAP.get(self.action, 'view')
+
         if has_unrestricted_permission(self.request, action, 'netbox_ipam_grouping', 'group'):
             return qs
 
