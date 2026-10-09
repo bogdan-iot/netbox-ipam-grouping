@@ -76,16 +76,12 @@
         border-top: 1px solid #dee2e6;
         border-bottom: 1px solid #dee2e6;
       }
-      .diff-category-header:first-child {
-        border-top: none;
-      }
+      .diff-category-header:first-child { border-top: none; }
       .diff-row {
         display: flex;
         border-bottom: 1px solid #f0f0f0;
       }
-      .diff-row:last-child {
-        border-bottom: none;
-      }
+      .diff-row:last-child { border-bottom: none; }
       .diff-cell {
         flex: 1;
         padding: 0.35rem 1rem;
@@ -94,11 +90,9 @@
         word-break: break-all;
         min-width: 0;
       }
-      .diff-cell + .diff-cell {
-        border-left: 1px solid #dee2e6;
-      }
-      .diff-cell-nb   { background: #fff8f8; color: #c0392b; }
-      .diff-cell-ext  { background: #fffdf0; color: #856404; }
+      .diff-cell + .diff-cell { border-left: 1px solid #dee2e6; }
+      .diff-cell-nb    { background: #fff8f8; color: #c0392b; }
+      .diff-cell-ext   { background: #fffdf0; color: #856404; }
       .diff-cell-empty { background: #fafafa; }
       .diff-col-header {
         display: flex;
@@ -112,9 +106,7 @@
         padding: 0.4rem 1rem;
         color: #495057;
       }
-      .diff-col-header-cell + .diff-col-header-cell {
-        border-left: 1px solid #dee2e6;
-      }
+      .diff-col-header-cell + .diff-col-header-cell { border-left: 1px solid #dee2e6; }
       .diff-summary {
         display: flex;
         gap: 1.25rem;
@@ -123,14 +115,8 @@
         background: #fdfdfd;
         flex-wrap: wrap;
       }
-      .diff-summary-item {
-        font-size: 0.82rem;
-        color: #495057;
-      }
-      .diff-summary-count {
-        font-weight: 700;
-        font-size: 1rem;
-      }
+      .diff-summary-item { font-size: 0.82rem; color: #495057; }
+      .diff-summary-count { font-weight: 700; font-size: 1rem; }
     </style>
 
     <script>
@@ -140,14 +126,13 @@
       const badge     = document.getElementById('sync-diff-badge');
       const container = document.getElementById('sync-diff-container');
 
-      if (!rawJson) return;   // no diff stored yet — leave card hidden
+      if (!rawJson) return;
 
       card.style.display = '';
 
       let raw = null;
       try { raw = JSON.parse(rawJson); } catch (e) { /* fall through */ }
 
-      // ── Error stored by the script ────────────────────────────────────
       if (!raw || raw.error) {
         badge.innerHTML = '<span class="badge bg-warning text-dark">Error</span>';
         container.innerHTML =
@@ -156,7 +141,6 @@
         return;
       }
 
-      // ── In-sync: empty object ─────────────────────────────────────────
       if (Object.keys(raw).length === 0) {
         badge.innerHTML = '<span class="badge bg-success">In Sync</span>';
         container.innerHTML =
@@ -165,17 +149,15 @@
         return;
       }
 
-      // ── Out of sync: render diff ──────────────────────────────────────
       badge.innerHTML = '<span class="badge bg-danger">Out of Sync</span>';
 
       const LABELS = {
-        prefixes:      { label: 'Prefixes',      icon: 'mdi-ip-network' },
-        ip_addresses:  { label: 'IP Addresses',  icon: 'mdi-ip'         },
+        prefixes:      { label: 'Prefixes',      icon: 'mdi-ip-network'       },
+        ip_addresses:  { label: 'IP Addresses',  icon: 'mdi-ip'               },
         ip_ranges:     { label: 'IP Ranges',      icon: 'mdi-arrow-left-right' },
-        member_groups: { label: 'Member Groups',  icon: 'mdi-group'      },
+        member_groups: { label: 'Member Groups',  icon: 'mdi-group'            },
       };
 
-      // Summary counts
       let totalNb = 0, totalExt = 0;
       for (const changes of Object.values(raw)) {
         totalNb  += (changes.only_in_netbox   || []).length;
@@ -234,7 +216,6 @@
     {# ── end Sync Diff panel ─────────────────────────────────────────────── #}
 
   </div>
-
   <div class="col col-md-6">
     <div class="card">
       <h5 class="card-header">External System</h5>
@@ -245,29 +226,42 @@
           current contents to it.
         </p>
         <div class="d-flex gap-2">
-          <button id="check-btn" class="btn btn-secondary" onclick="runScript('check')">
-            <i class="mdi mdi-sync-alert"></i> Check Contents
-          </button>
+
+          {# Check Contents: disabled server-side when no AppViz object ID is set #}
+          <span
+                  {% if not object.custom_field_data.appviz_object_id %}
+                  title="No AppViz object ID is set on this group"
+                  style="cursor: not-allowed;"
+                  {% endif %}
+          >
+            <button
+                    id="check-btn"
+                    class="btn btn-secondary"
+                    onclick="runScript('check')"
+                    {% if not object.custom_field_data.appviz_object_id %}
+                    disabled
+                    style="pointer-events: none;"
+                    {% endif %}
+            >
+              <i class="mdi mdi-sync-alert"></i> Check Contents
+            </button>
+          </span>
 
           <button
             id="sync-btn"
             class="btn btn-primary"
-            onclick="runScript('sync')"
+            onclick="confirmSync()"
             disabled
             title="Run 'Check Contents' first to enable syncing"
-            data-sync-status="{{ object.custom_field_data.appviz_sync|lower|default:'' }}"
+            data-sync-status="{% if object.custom_field_data.appviz_sync == True %}true{% elif object.custom_field_data.appviz_sync == False %}false{% else %}none{% endif %}"
           >
             <i class="mdi mdi-cloud-upload"></i> Sync to AppViz
           </button>
         </div>
 
-        <div id="script-status" class="mt-3" style="display:none;">
-          <div id="script-spinner" class="d-flex align-items-center gap-2 text-muted">
-            <div class="spinner-border spinner-border-sm" role="status"></div>
-            <span id="script-message">Please wait&hellip;</span>
-          </div>
-          <div id="script-result" style="display:none;"></div>
-        </div>
+        {# Single container — content is fully replaced by JS, no show/hide siblings #}
+        <div id="script-status" class="mt-3" style="display:none;"></div>
+
       </div>
     </div>
   </div>
@@ -318,15 +312,22 @@
       <h5 class="card-header">Prefixes</h5>
       <div class="card-body">
         <table class="table table-hover">
-          <thead><tr><th>Prefix</th><th>Description</th></tr></thead>
+          <thead><tr><th>Prefix</th><th>Site</th><th>Description</th></tr></thead>
           <tbody>
             {% for prefix in prefixes %}
               <tr>
                 <td><a href="{{ prefix.get_absolute_url }}">{{ prefix }}</a></td>
+                <td>
+                  {% if prefix.scope %}
+                    <a href="{{ prefix.scope.get_absolute_url }}">{{ prefix.scope }}</a>
+                  {% else %}
+                    <span class="text-muted">&mdash;</span>
+                  {% endif %}
+                </td>
                 <td>{{ prefix.description|default:"&mdash;" }}</td>
               </tr>
             {% empty %}
-              <tr><td colspan="2" class="text-muted">No prefixes assigned.</td></tr>
+              <tr><td colspan="3" class="text-muted">No prefixes assigned.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -386,146 +387,162 @@
 const GROUP_ID   = {{ object.pk }};
 const CSRF_TOKEN = document.getElementById('csrf-token').value;
 
-// ── Sync button: enable only when sync_status is exactly "false" ──────────
+// ── Sync button state on page load ────────────────────────────────────────────
 (function () {
-  const btn    = document.getElementById('sync-btn');
-  const status = btn.getAttribute('data-sync-status');
-  // Django |lower renders Python False → "false", True → "true", None/unset → ""
+  const syncBtn = document.getElementById('sync-btn');
+  const status  = syncBtn.getAttribute('data-sync-status');
   if (status !== 'true') {
-    btn.disabled = false;
-    btn.removeAttribute('title');
+    syncBtn.disabled = false;
+    syncBtn.removeAttribute('title');
   }
 })();
 
-// ── Script runner ─────────────────────────────────────────────────────────
+// ── Script config ─────────────────────────────────────────────────────────────
 const SCRIPTS = {
-    check: {
-        id: 2,   // check_group_sync.CheckGroupSyncScript
-        message: 'Checking group contents against external system\u2026',
-        btnId: 'check-btn',
-        reload: true,
-    },
-    sync: {
-        id: 3,   // sync_group_to_external.SyncGroupToExternalScript — confirm ID after upload
-        message: 'Pushing group contents to external system\u2026',
-        btnId: 'sync-btn',
-        reload: false,
-    },
+  check: {
+    id:      {{ check_script_id|default:'null' }},
+    message: 'Checking group contents against external system\u2026',
+    btnId:   'check-btn',
+    reload:  true,
+  },
+  sync: {
+    id:      {{ sync_script_id|default:'null' }},
+    message: 'Pushing group contents to external system\u2026',
+    btnId:   'sync-btn',
+    reload:  true,
+  },
 };
 
-async function runScript(action) {
-    const cfg = SCRIPTS[action];
-    if (cfg.id === null) {
-        alert('This script is not yet configured.');
-        return;
-    }
-    const btn      = document.getElementById(cfg.btnId);
-    const otherBtn = document.getElementById(action === 'check' ? 'sync-btn' : 'check-btn');
-    const statusDiv  = document.getElementById('script-status');
-    const spinnerDiv = document.getElementById('script-spinner');
-    const msgEl      = document.getElementById('script-message');
-    const resultDiv  = document.getElementById('script-result');
-
-    btn.disabled      = true;
-    otherBtn.disabled = true;
-    statusDiv.style.display  = 'block';
-    spinnerDiv.style.display = 'flex';
-    resultDiv.style.display  = 'none';
-    msgEl.textContent = cfg.message;
-
-    try {
-        const submitResp = await fetch(
-            `/api/extras/scripts/${cfg.id}/`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': CSRF_TOKEN,
-                },
-                body: JSON.stringify({ data: { group: GROUP_ID }, commit: true }),
-            }
-        );
-
-        if (!submitResp.ok) {
-            const err = await submitResp.json();
-            throw new Error(err.detail || JSON.stringify(err));
-        }
-
-        const submitted = await submitResp.json();
-
-        // In NetBox 4.x the POST response wraps the job object under `result`.
-        // Extract the path only so it works regardless of internal hostname.
-        const rawJobUrl = submitted.result?.url;
-        if (!rawJobUrl) throw new Error('No job URL returned from script submission.');
-        const jobUrl = new URL(rawJobUrl).pathname;   // e.g. /api/core/jobs/42/
-
-        msgEl.textContent = 'Waiting for job to complete\u2026';
-        const job = await pollJob(jobUrl);
-
-        spinnerDiv.style.display = 'none';
-        resultDiv.style.display  = 'block';
-
-        const status    = job.status?.value;
-        const isSuccess = status === 'completed';
-        const isError   = status === 'failed' || status === 'errored';
-        const alertClass = isSuccess ? 'alert-success' : isError ? 'alert-danger' : 'alert-warning';
-        const icon       = isSuccess ? 'mdi-check-circle' : isError ? 'mdi-alert-circle' : 'mdi-information';
-        const output     = (job.data?.output || '').trim();
-
-        resultDiv.innerHTML = `
-            <div class="alert ${alertClass} mb-0">
-                <div class="d-flex align-items-start gap-2">
-                    <i class="mdi ${icon} mt-1"></i>
-                    <div>
-                        <strong>${job.status?.label || status}</strong>
-                        ${output
-                            ? `<pre class="mb-0 mt-1" style="font-size:0.85em;white-space:pre-wrap;">${escapeHtml(output)}</pre>`
-                            : ''}
-                    </div>
-                </div>
-            </div>`;
-
-        if (isSuccess && cfg.reload) {
-            setTimeout(() => window.location.reload(), 2000);
-        }
-
-    } catch (err) {
-        spinnerDiv.style.display = 'none';
-        resultDiv.style.display  = 'block';
-        resultDiv.innerHTML = `
-            <div class="alert alert-danger mb-0">
-                <i class="mdi mdi-alert-circle"></i>
-                ${escapeHtml(err.message)}
-            </div>`;
-    } finally {
-        btn.disabled      = false;
-        otherBtn.disabled = false;
-    }
-}
-
-async function pollJob(url, interval = 1500, maxAttempts = 60) {
-    for (let i = 0; i < maxAttempts; i++) {
-        await new Promise(r => setTimeout(r, interval));
-        const resp = await fetch(url, {
-            headers: { 'X-CSRFToken': getCookie('csrftoken') },
-        });
-        if (!resp.ok) throw new Error(`Poll failed: HTTP ${resp.status}`);
-        const job = await resp.json();
-        const s = job.status?.value || job.status;
-        if (['completed', 'failed', 'errored'].includes(s)) return job;
-    }
-    throw new Error('Job timed out after polling.');
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function getCookie(name) {
-    const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return m ? decodeURIComponent(m[2]) : '';
+  const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return m ? decodeURIComponent(m[2]) : '';
 }
 
-function escapeHtml(s) {
-    return String(s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function showSpinner(message) {
+  const el = document.getElementById('script-status');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="d-flex align-items-center gap-2 text-muted">
+      <div class="spinner-border spinner-border-sm" role="status"></div>
+      <span>${escapeHtml(message)}</span>
+    </div>`;
+}
+
+function showResult(job) {
+  const statusVal  = job.status?.value;
+  const isSuccess  = statusVal === 'completed';
+  const isError    = statusVal === 'failed' || statusVal === 'errored';
+  const alertClass = isSuccess ? 'alert-success' : isError ? 'alert-danger' : 'alert-warning';
+  const icon       = isSuccess ? 'mdi-check-circle' : isError ? 'mdi-alert-circle' : 'mdi-information';
+  const output     = (job.data?.output || '').trim();
+
+  const el = document.getElementById('script-status');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="alert ${alertClass} mb-0">
+      <div class="d-flex align-items-start gap-2">
+        <i class="mdi ${icon} mt-1"></i>
+        <div>
+          <strong>${escapeHtml(job.status?.label || statusVal || 'Unknown')}</strong>
+          ${output ? `<pre class="mb-0 mt-1" style="font-size:0.85em;white-space:pre-wrap;">${escapeHtml(output)}</pre>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function showError(message) {
+  const el = document.getElementById('script-status');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="alert alert-danger mb-0">
+      <i class="mdi mdi-alert-circle me-1"></i>${escapeHtml(message)}
+    </div>`;
+}
+
+function confirmSync() {
+  if (confirm(
+    `Are you sure you want to sync this group to AppViz?\n\nThis will push the current NetBox contents to the external system and cannot be undone.`
+  )) {
+    runScript('sync');
+  }
+}
+
+// ── Script runner ─────────────────────────────────────────────────────────────
+async function runScript(action) {
+  const cfg = SCRIPTS[action];
+  if (cfg.id === null) {
+    alert('This script is not yet configured.');
+    return;
+  }
+
+  const btn      = document.getElementById(cfg.btnId);
+  const otherBtn = document.getElementById(action === 'check' ? 'sync-btn' : 'check-btn');
+
+  btn.disabled      = true;
+  otherBtn.disabled = true;
+
+  try {
+    showSpinner(cfg.message);
+
+    const submitResp = await fetch(
+      `/api/extras/scripts/${cfg.id}/`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF_TOKEN,
+        },
+        body: JSON.stringify({ data: { group: GROUP_ID }, commit: true }),
+      }
+    );
+
+    if (!submitResp.ok) {
+      const err = await submitResp.json();
+      throw new Error(err.detail || JSON.stringify(err));
+    }
+
+    const submitted = await submitResp.json();
+    const rawJobUrl = submitted.result?.url;
+    if (!rawJobUrl) throw new Error('No job URL returned from script submission.');
+    const jobUrl = new URL(rawJobUrl).pathname;
+
+    showSpinner('Waiting for job to complete\u2026');
+
+    const job = await pollJob(jobUrl);
+    showResult(job);
+
+    if (job.status?.value === 'completed' && cfg.reload) {
+      setTimeout(() => window.location.reload(), 5000);
+    }
+
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.disabled      = false;
+    otherBtn.disabled = false;
+  }
+}
+
+// ── Job poller ────────────────────────────────────────────────────────────────
+async function pollJob(url, interval = 1500, maxAttempts = 60) {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, interval));
+    const resp = await fetch(url, {
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    });
+    if (!resp.ok) throw new Error(`Poll failed: HTTP ${resp.status}`);
+    const job = await resp.json();
+    const s = job.status?.value || job.status;
+    if (['completed', 'failed', 'errored'].includes(s)) return job;
+  }
+  throw new Error('Job timed out after polling.');
 }
 </script>
 {% endblock %}

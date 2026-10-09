@@ -3,6 +3,7 @@ from django.db.models import Q
 from netbox.filtersets import NetBoxModelFilterSet
 
 from ..models import Application, Group
+from ..utils import has_unrestricted_permission
 
 
 class ApplicationAPIFilterSet(NetBoxModelFilterSet):
@@ -56,6 +57,14 @@ class GroupAPIFilterSet(NetBoxModelFilterSet):
         request = getattr(self, "request", None)
         if not request or request.user.is_superuser:
             return queryset
+
+        # Users with an unconstrained view permission on groups see all of
+        # them; the ownership scoping below only applies to everyone else.
+        if has_unrestricted_permission(
+            request, "view", "netbox_ipam_grouping", "group"
+        ):
+            return queryset
+
         user = request.user
         return queryset.filter(
             Q(owner__users=user) |
